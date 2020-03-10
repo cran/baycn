@@ -4,13 +4,29 @@
 \alias{mhEdge}
 \title{mhEdge}
 \usage{
-mhEdge(data, adjMatrix, burnIn = 0.2, iterations = 1000, nGV,
-  pmr = FALSE, prior = c(0.05, 0.05, 0.9), progress = TRUE,
-  thinTo = 200)
+mhEdge(
+  data,
+  adjMatrix,
+  burnIn = 0.2,
+  iterations = 1000,
+  nCPh = 0,
+  nGV = 0,
+  pmr = FALSE,
+  prior = c(0.05, 0.05, 0.9),
+  progress = TRUE,
+  thinTo = 200
+)
 }
 \arguments{
-\item{data}{A matrix with the nodes across the columns and the observations
-down the rows.}
+\item{data}{A matrix with the variables across the columns and the
+observations down the rows. If there are genetic variants in the data these
+variables must come before the remaining variables. If there are clinical
+phenotypes in the data these variables must come after all other variables.
+For example, if there is a data set with one genetic variant variable, three
+gene expression variables, and one clinical phenotype variable the first
+column in the data matrix must contain the genetic variant data, the next
+three columns will contain the gene expression data, and the last column will
+contain the clinical phenotype data.}
 
 \item{adjMatrix}{An adjacency matrix indicating the edges that will be
 considered by the Metropolis-Hastings algorithm. This can be the output from
@@ -23,13 +39,17 @@ sample that will be discarded.}
 \item{iterations}{An integer for the number of iterations to run the MH
 algorithm.}
 
+\item{nCPh}{The number of clinical phenotypes in the graph.}
+
 \item{nGV}{The number of genetic variants in the graph.}
 
 \item{pmr}{Logical. If true the Metropolis-Hastings algorithm will use the
 Principle of Mendelian Randomization (PMR). This prevents the direction of an
-edge pointing from a gene expression node to a genetic variant node.}
+edge pointing from a gene expression or a clinical phenotype node to a
+genetic variant node.}
 
-\item{prior}{A vector containing the prior probability of each edge state.}
+\item{prior}{A vector containing the prior probability for the three edge
+states.}
 
 \item{progress}{Logical. If TRUE a progress bar will be printed.}
 
@@ -37,7 +57,7 @@ edge pointing from a gene expression node to a genetic variant node.}
 should be thinned to.}
 }
 \value{
-An object of class mcmc containing 9 elements:
+An object of class baycn containing 9 elements:
 
 \itemize{
 
@@ -80,7 +100,7 @@ data_m1 <- simdata(b0 = 0,
                    s = 1,
                    graph = 'm1_gv',
                    ss = 1,
-                   p = 0.27)
+                   q = 0.27)
 
 # Create an adjacency matrix with the true edges.
 am_m1 <- matrix(c(0, 1, 0,
@@ -95,6 +115,7 @@ mh_m1_pmr <- mhEdge(data = data_m1,
                     adjMatrix = am_m1,
                     burnIn = 0.2,
                     iterations = 1000,
+                    nCPh = 0,
                     nGV = 1,
                     pmr = TRUE,
                     prior = c(0.05,
@@ -127,6 +148,7 @@ mh_gn4 <- mhEdge(data = data_gn4,
                  adjMatrix = am_gn4,
                  burnIn = 0.2,
                  iterations = 1000,
+                 nCPh = 0,
                  nGV = 0,
                  pmr = FALSE,
                  prior = c(0.05,

@@ -3,8 +3,15 @@
 #' The main function for the Metropolis-Hastings algorithm. It returns the
 #' posterior distribution of the edge directions.
 #'
-#' @param data A matrix with the nodes across the columns and the observations
-#' down the rows.
+#' @param data A matrix with the variables across the columns and the
+#' observations down the rows. If there are genetic variants in the data these
+#' variables must come before the remaining variables. If there are clinical
+#' phenotypes in the data these variables must come after all other variables.
+#' For example, if there is a data set with one genetic variant variable, three
+#' gene expression variables, and one clinical phenotype variable the first
+#' column in the data matrix must contain the genetic variant data, the next
+#' three columns will contain the gene expression data, and the last column will
+#' contain the clinical phenotype data.
 #'
 #' @param adjMatrix An adjacency matrix indicating the edges that will be
 #' considered by the Metropolis-Hastings algorithm. This can be the output from
@@ -17,20 +24,24 @@
 #' @param iterations An integer for the number of iterations to run the MH
 #' algorithm.
 #'
+#' @param nCPh The number of clinical phenotypes in the graph.
+#'
 #' @param nGV The number of genetic variants in the graph.
 #'
 #' @param pmr Logical. If true the Metropolis-Hastings algorithm will use the
 #' Principle of Mendelian Randomization (PMR). This prevents the direction of an
-#' edge pointing from a gene expression node to a genetic variant node.
+#' edge pointing from a gene expression or a clinical phenotype node to a
+#' genetic variant node.
 #'
-#' @param prior A vector containing the prior probability of each edge state.
+#' @param prior A vector containing the prior probability for the three edge
+#' states.
 #'
 #' @param progress Logical. If TRUE a progress bar will be printed.
 #'
 #' @param thinTo An integer indicating the number of observations the chain
 #' should be thinned to.
 #'
-#' @return An object of class mcmc containing 9 elements:
+#' @return An object of class baycn containing 9 elements:
 #'
 #' \itemize{
 #'
@@ -79,7 +90,7 @@
 #'                    s = 1,
 #'                    graph = 'm1_gv',
 #'                    ss = 1,
-#'                    p = 0.27)
+#'                    q = 0.27)
 #'
 #' # Create an adjacency matrix with the true edges.
 #' am_m1 <- matrix(c(0, 1, 0,
@@ -94,6 +105,7 @@
 #'                     adjMatrix = am_m1,
 #'                     burnIn = 0.2,
 #'                     iterations = 1000,
+#'                     nCPh = 0,
 #'                     nGV = 1,
 #'                     pmr = TRUE,
 #'                     prior = c(0.05,
@@ -126,6 +138,7 @@
 #'                  adjMatrix = am_gn4,
 #'                  burnIn = 0.2,
 #'                  iterations = 1000,
+#'                  nCPh = 0,
 #'                  nGV = 0,
 #'                  pmr = FALSE,
 #'                  prior = c(0.05,
@@ -142,13 +155,91 @@ mhEdge <- function (data,
                     adjMatrix,
                     burnIn = 0.2,
                     iterations = 1000,
-                    nGV,
+                    nCPh = 0,
+                    nGV = 0,
                     pmr = FALSE,
                     prior = c(0.05,
                               0.05,
                               0.9),
                     progress = TRUE,
                     thinTo = 200) {
+
+  # Preprocessing checks -------------------------------------------------------
+
+  # Check that data is a matrix.
+  if (!is.matrix(data)) {
+
+    stop ('data is not a matrix')
+
+  }
+
+  # Check that adjMatrix is a square matrix.
+  if (dim(adjMatrix)[1] != dim(adjMatrix)[2]) {
+
+    stop ('adjMatrix must be a square matrix')
+
+  }
+
+  # Check that adjMatrix has all zeros on the diagonal.
+  if (sum(diag(adjMatrix)) != 0) {
+
+    stop ('adjMatrix must have zeros on the diagonal')
+
+  }
+
+  # Check that adjMatrix has the same number of columns as data.
+  if (dim(adjMatrix)[1] != dim(data)[2]) {
+
+    stop ('data must have the same number of columns as adjMatrix')
+
+  }
+
+  # Check the prior probability vector has three elements.
+  if (length(prior) != 3) {
+
+    stop ('prior must have three elements')
+
+  }
+
+  # Check the prior probability sums to 1.
+  if (sum(prior) != 1) {
+
+    stop ('prior must sum to 1')
+
+  }
+
+  # Check that burnIn, thinTo, and iterations agree.
+  if ((1 - burnIn) * iterations < thinTo) {
+
+    stop ('thinTo is greater than the number of iterations after the burnIn')
+
+  }
+
+  # Check that nGV > 0 if pmr is TRUE.
+  if (pmr && nGV == 0) {
+
+    stop('nGV must be at least 1 when pmr = TRUE')
+
+  }
+
+  # Check that the number of genetic variants is less than or equal to the
+  # number of nodes.
+  if (nGV > dim(data)[2]) {
+
+    stop ('nGV must be less than or equal to the number of columns in data')
+
+  }
+
+  # Check that the number of clinical phenotypes is less than or equal to the
+  # number of nodes.
+  if (nCPh > dim(data)[2]) {
+
+    stop ('nCPh must be less than or equal to the number of columns in data')
+
+  }
+
+  # Save the time when baycn starts.
+  startTime <- Sys.time()
 
   # Set up ---------------------------------------------------------------------
 
@@ -164,7 +255,9 @@ mhEdge <- function (data,
   # Determine the edge type for each edge in the graph (gv-ge or ge-ge, gv-gv)
   edgeType <- detType(coord = coord,
                       nEdges = nEdges,
+                      nCPh = nCPh,
                       nGV = nGV,
+                      nNodes = nNodes,
                       pmr = pmr)
 
   # Calculate the probability of choosing from 1 to nEdges.
@@ -179,7 +272,12 @@ mhEdge <- function (data,
 
   # Check for potential cycles in the graph and return the edge directions, edge
   # numbers, and the decimal numbers for each cycle if any exist.
-  cp <- cyclePrep(adjMatrix)
+  cf <- cycleFndr(adjMatrix = adjMatrix,
+                  nEdges = nEdges,
+                  nCPh = nCPh,
+                  nGV = nGV,
+                  pmr = pmr,
+                  position = coord)
 
   # Initialize vectors, lists, and matrices ------------------------------------
 
@@ -210,6 +308,7 @@ mhEdge <- function (data,
   # combinations for each node. (LOG Likelihood Environment)
   logle <- lookUp(data = data,
                   adjMatrix = adjMatrix,
+                  nCPh = nCPh,
                   nGV = nGV,
                   nNodes = nNodes,
                   pmr = pmr)
@@ -223,24 +322,26 @@ mhEdge <- function (data,
                       prob = prior)
 
   # Check if any gv nodes have ge node parents.
-  if (pmr == TRUE) {
+  if (pmr || nCPh >= 1) {
 
-    # Change the direction of the ge -> gv edges to gv -> ge.
+    # Reverse the direction of any ge -> gv, gv -> cph, or ge -> cph edges.
     currentES[edgeType == 1 & currentES == 1] <- 0
 
   }
 
-  # Check the output of the cyclePrep function. If there are cycles in the graph
-  # run the rmCycle function to remove any directed cycles.
-  if (!is.null(cp$cycleDN)) {
+  # If there are potential directed cycles in the graph check if they are
+  # present and remove them if they are.
+  if (!is.null(cf$cycles)) {
 
     # Remove any directed cycles in the graph.
-    currentES <- rmCycle(cycleDN = cp$cycleDN,
-                         edgeNum = cp$edgeNum,
-                         edgeType = edgeType,
-                         individual = currentES,
-                         pmr = pmr,
-                         prior = prior)
+    currentES <- cycleRmvr(cycles = cf$cycles,
+                           edgeID = cf$edgeID,
+                           edgeType = edgeType,
+                           currentES = currentES,
+                           nCycles = cf$nCycles,
+                           nEdges = nEdges,
+                           pmr = pmr,
+                           prior = prior)
 
   }
 
@@ -265,9 +366,6 @@ mhEdge <- function (data,
 
   # Start the Metropolis-Hastings algorithm ------------------------------------
 
-  # Get the time the Metropolis-Hastings algorithm starts.
-  startTime <- Sys.time()
-
   # Create progress bar.
   if (progress == TRUE) {
 
@@ -288,42 +386,17 @@ mhEdge <- function (data,
 
     # If there are potential directed cycles in the graph check if they are
     # present and remove them if they are.
-    if (!is.null(cp$cycleDN)) {
+    if (!is.null(cf$cycles)) {
 
       # Remove any directed cycles in the graph.
-      proposedES <- rmCycle(cycleDN = cp$cycleDN,
-                            edgeNum = cp$edgeNum,
-                            edgeType = edgeType,
-                            individual = proposedES,
-                            pmr = pmr,
-                            prior = prior)
-
-    }
-
-    # If the graph after mutation and removing directed cycles is the same as
-    # the graph at the previous iteration then return that graph without
-    # calculating the log likelihood.
-    if (identical(proposedES, currentES)) {
-
-      # Store the accepted graph after burnin and thinning.
-      if (e %in% keep) {
-
-        # Update the counter if e is in the keep vector
-        counter <- counter + 1
-
-        # Store the accepted graph in the MarkovChain matrix
-        MarkovChain[counter, ] <- currentES
-
-        # Store the accepted likelihood
-        likelihood[[counter]] <- sum(currentLL)
-
-        # Calculate the decimal for the accepted graph.
-        graphDecimal[[counter]] <- sum(currentES * 3^(1:nEdges))
-
-      }
-
-      # Skip the rest of the for loop and go to the next iteration
-      next
+      proposedES <- cycleRmvr(cycles = cf$cycles,
+                              edgeID = cf$edgeID,
+                              edgeType = edgeType,
+                              currentES = proposedES,
+                              nCycles = cf$nCycles,
+                              nEdges = nEdges,
+                              pmr = pmr,
+                              prior = prior)
 
     }
 
@@ -379,7 +452,7 @@ mhEdge <- function (data,
       likelihood[[counter]] <- sum(currentLL)
 
       # Calculate the decimal for the accepted graph.
-      graphDecimal[[counter]] <- sum(currentES * 3^(1:nEdges))
+      graphDecimal[[counter]] <- sum(currentES * 3^(0:(nEdges - 1)))
 
     }
 
@@ -398,9 +471,6 @@ mhEdge <- function (data,
     close(pb)
 
   }
-
-  # Get the time the Metropolis-Hastings algorithm ends
-  endTime <- Sys.time()
 
   # Posterior probability matrix -----------------------------------------------
 
@@ -470,19 +540,22 @@ mhEdge <- function (data,
                      ceiling(iterations / thinTo),
                      ceiling(((1 - burnIn) * iterations) / thinTo))
 
-  # Create an mcmc object ------------------------------------------------------
-  mcmcObj <- new('mcmc',
-                 burnIn = burnIn * 100,
-                 chain = MarkovChain,
-                 decimal = graphDecimal,
-                 iterations = iterations,
-                 posteriorES = posteriorES,
-                 posteriorPM = posteriorPM,
-                 likelihood = likelihood,
-                 stepSize = stepSize,
-                 time = as.double((endTime - startTime),
-                                  units = 'secs'))
+  # Save the time when baycn ends.
+  endTime <- Sys.time()
 
-  return (mcmcObj)
+  # Create a baycn object ------------------------------------------------------
+  baycnObj <- new('baycn',
+                  burnIn = burnIn * 100,
+                  chain = MarkovChain,
+                  decimal = graphDecimal,
+                  iterations = iterations,
+                  posteriorES = posteriorES,
+                  posteriorPM = posteriorPM,
+                  likelihood = likelihood,
+                  stepSize = stepSize,
+                  time = as.double((endTime - startTime),
+                                   units = 'secs'))
+
+  return (baycnObj)
 
 }

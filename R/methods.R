@@ -1,16 +1,41 @@
 #' show
 #'
-#' @param object An object of class mcmc.
+#' @param object An object of class baycn.
 #'
 #' @importFrom methods show
 #'
 #' @export
 setMethod('show',
-          signature = 'mcmc',
+          signature = 'baycn',
           definition = function (object) {
 
+            # Print the class name.
             cat('Object of class: ',
                 class(object),
+                '\n',
+                sep = '')
+
+            # Print the number of iterations.
+            cat('Number of iterations: ',
+                object@iterations,
+                '\n',
+                sep = '')
+
+            # Print the stepsize.
+            cat('Step size: ',
+                object@stepSize,
+                '\n',
+                sep = '')
+
+            # Print the number of nodes.
+            cat('Number of nodes in the network: ',
+                dim(object@posteriorPM)[1],
+                '\n',
+                sep = '')
+
+            # Print the number of edges.
+            cat('Number of edges considered: ',
+                dim(object@posteriorES)[1],
                 '\n',
                 sep = '')
 
@@ -18,16 +43,14 @@ setMethod('show',
 
 #' summary
 #'
-#' @param object An object of class mcmc.
+#' @param object An object of class baycn.
 #'
 #' @param ... Other Arguments passed to methods.
 #'
 #' @export
 setMethod('summary',
-          signature(object = 'mcmc'),
+          signature(object = 'baycn'),
           definition = function (object, ...) {
-
-            returned <- list()
 
             # Get the number of edges to loop through when calculating the
             # probability of each edge state.
@@ -36,95 +59,66 @@ setMethod('summary',
             # Get the number of samples kept.
             nRow <- nrow(object@chain)
 
-            returned$posterior <- object@posteriorES
-
             # Create a matrix for the summary of the likelihood.
             logLikSummary <- matrix(nrow = 1,
                                     ncol = 5)
 
+            # Name the rows and columns of the log likelihood summary matrix.
             colnames(logLikSummary) <- c('Min', '1Q', 'Median', '3Q', 'Max')
             rownames(logLikSummary) <- ''
 
+            # Calculate the summary of the log likelihood.
             logLikSummary[1, ] <- round(summary(object@likelihood)[c(1:3,
                                                                      5:6)],
                                         2)
 
-            returned$likelihood <- logLikSummary
+            # Display the posterior probability for each edge.
+            cat('Posterior probability: \n',
+                sep = '')
+            print(object@posteriorES)
 
-            # Calculate the number of unique graphs
-            nGraphs <- length(unique(object@decimal))
+            # Display the min, 1q, median, 3q, and max.
+            cat('\n',
+                'Log likelihood: \n',
+                sep = '')
+            print(logLikSummary)
 
-            returned$graphs <- nGraphs
+            # Display the number of unique graphs
+            cat('\n',
+                'Number of unique graphs: ',
+                length(unique(object@decimal)),
+                sep = '')
 
-            # Add the runtime in seconds to the returned list.
-            returned$runtime <- object@time
+            # Display the amount of time it took to complete.
+            cat('\n',
+                'Run time in seconds: ',
+                object@time,
+                sep = '')
 
-            # Add the iterations, burn in, and step size to the returned list.
-            returned$iterations <- object@iterations
-            returned$burnIn <- object@burnIn
-            returned$stepSize <- object@stepSize
-
-            class(returned) <- 'summary.mcmc'
-
-            returned
+            # Display the number of iterations, burn in, and step size
+            cat('\n',
+                'Iterations: ',
+                object@iterations,
+                '\n',
+                'Burn in: ',
+                object@burnIn,
+                '%',
+                '\n',
+                'Step size: ',
+                object@stepSize,
+                sep = '')
 
           })
 
-#' @method print summary.mcmc
-#'
-#' @export
-print.summary.mcmc <- function (x, ...) {
-
-  # Display the posterior probability for each edge.
-  cat('Posterior probability: \n')
-  print(x$posterior)
-
-  # Display the min, 1q, median, 3q, and max.
-  cat('\n',
-      'Log likelihood: \n',
-      sep = '')
-  print(x$likelihood)
-
-  # Display the number of unique graphs
-  cat('\n',
-      'Number of unique graphs: ',
-      x$graphs,
-      sep = '')
-
-  # Display the amount of time it took to complete.
-  cat('\n',
-      'Run time in seconds: ',
-      x$runtime,
-      sep = '')
-
-  # Display the number of iterations, burn in, and step size
-  cat('\n',
-      'Iterations: ',
-      x$iterations,
-      sep = '')
-
-  cat('\n',
-      'Burn in: ',
-      x$burnIn,
-      '%',
-      sep = '')
-
-  cat('\n',
-      'Step size: ',
-      x$stepSize,
-      sep = '')
-
-}
-
 #' plot
 #'
-#' @param x An object of classs mcmc.
+#' @param x An object of classs baycn.
 #'
 #' @param y Optional if x is the appropriate structure.
 #'
 #' @param ... Other Arguments passed to methods.
 #'
-#' @aliases plot,mcmc-method
+#' @aliases plot,baycn-method
 #'
 #' @import ggplot2
 #'
@@ -132,10 +126,13 @@ print.summary.mcmc <- function (x, ...) {
 #'
 #' @export
 setMethod('plot',
-          signature(x = 'mcmc'),
+          signature(x = 'baycn'),
           definition = function (x, y, ...) {
 
+            # The following lines are to avoid the note 'Undefined global
+            # functions or variables: likelihood, decimal'.
             likelihood <- NULL
+            decimal <- NULL
 
             # Number of samples kept
             nSamples <- length(x@likelihood)
