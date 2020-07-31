@@ -1,27 +1,27 @@
-#' directedAM
-#'
-#' Takes a posterior proability adjacency matrix and using the cutoff for edge
-#' presence and direction converts it to a directed adjacency matrix. This
-#' matrix can then be used as input to the functions in the igraph package to
-#' create a plot of the network.
-#'
-#' @param ppm A posterior proability adjacency matrix.
-#'
-#' @param presence A scalar between 0 and 1. This is the cutoff for considering
-#' an edge to be present. For example, if presence = 0.4 then an edge is
-#' considered to be present if the sum of the posterior proability for the two
-#' edge directions is greater than 0.4. The edge will be considered to be absent
-#' if this sum is less than 0.4.
-#'
-#' @param direction A scalar between 0 and 1. This is the cutoff for determining
-#' the direction of an edge. For example, if direction = 0.2 then an edge is
-#' considered to be directed if the difference between the posterior proability
-#' for the two edge directions is greater than 0.2. An edge will be considered
-#' undirected if the difference is less than 0.2.
-#'
-#' @return An adjacency matrix that can be used as the input to create a plot of
-#' the network.
-#'
+# directedAM
+#
+# Takes a posterior proability adjacency matrix and using the cutoff for edge
+# presence and direction converts it to a directed adjacency matrix. This
+# matrix can then be used as input to the functions in the igraph package to
+# create a plot of the network.
+#
+# @param ppm A posterior proability adjacency matrix.
+#
+# @param presence A scalar between 0 and 1. This is the cutoff for considering
+# an edge to be present. For example, if presence = 0.4 then an edge is
+# considered to be present if the sum of the posterior proability for the two
+# edge directions is greater than 0.4. The edge will be considered to be absent
+# if this sum is less than 0.4.
+#
+# @param direction A scalar between 0 and 1. This is the cutoff for determining
+# the direction of an edge. For example, if direction = 0.2 then an edge is
+# considered to be directed if the difference between the posterior proability
+# for the two edge directions is greater than 0.2. An edge will be considered
+# undirected if the difference is less than 0.2.
+#
+# @return An adjacency matrix that can be used as the input to create a plot of
+# the network.
+#
 directedAM <- function (ppm,
                         presence,
                         direction) {

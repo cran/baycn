@@ -28,17 +28,19 @@ sNorm <- function (N,
 #
 # @param N The number of observations to simulate.
 #
-# @param p The probability of success.
+# @param p The probability of success. For rbinom the value 1 represents a
+# success.
 #
 # @return A vector containing the simulated data.
 #
+#' @importFrom stats rbinom
+#'
 sBinom <- function (N,
                     p) {
 
-  return (sample(x = 0:1,
-                 size = N,
-                 replace = TRUE,
-                 prob = c(p, 1 - p)))
+  return (rbinom(n = N,
+                 size = 1,
+                 prob = p))
 
 }
 
@@ -68,9 +70,9 @@ sMulti <- function (N,
 
 # cNorm
 #
-# @param N The number of observations to simulate.
+# Generates normal data for child nodes (nodes one or more parents).
 #
-# @param mParents The number of parent nodes.
+# @param N The number of observations to simulate.
 #
 # @param parentData A list containing the data of the parents nodes.
 #
@@ -84,11 +86,21 @@ sMulti <- function (N,
 #' @importFrom stats as.formula rnorm
 #'
 cNorm <- function (N,
-                   mParents,
                    parentData,
                    b0,
                    b1,
                    s) {
+
+  # Check if the parent vector and the signal strength vector have the same
+  # number of elements.
+  if (length(parentData) != length(b1)) {
+
+    stop ('parentData and b1 must have the same number of elements')
+
+  }
+
+  # Determine the number of parents.
+  mParents <- length(parentData)
 
   # Create a vector that will hold a linear model as a character string.
   lmFormula <- vector(length = mParents + 1)
@@ -123,9 +135,9 @@ cNorm <- function (N,
 
 # cBinom
 #
-# @param N The number of observations to simulate.
+# Generates binomial data for child nodes (nodes one or more parents).
 #
-# @param mParents The number of parent nodes.
+# @param N The number of observations to simulate.
 #
 # @param parentData A list containing the data of the parents nodes.
 #
@@ -138,14 +150,23 @@ cNorm <- function (N,
 #
 # @return A vector containing the simulated data.
 #
-#' @importFrom stats as.formula
+#' @importFrom stats as.formula rbinom
 #'
 cBinom <- function (N,
-                    mParents,
                     parentData,
                     b0,
-                    b1,
-                    p) {
+                    b1) {
+
+  # Check if the parent vector and the signal strength vector have the same
+  # number of elements.
+  if (length(parentData) != length(b1)) {
+
+    stop ('parentData and b1 must have the same number of elements')
+
+  }
+
+  # Determine the number of parents.
+  mParents <- length(parentData)
 
   # Create a vector that will hold a linear model as a character string.
   lmFormula <- vector(length = mParents + 1)
@@ -168,29 +189,25 @@ cBinom <- function (N,
 
   # Create a formula object and evaluate it. The subset, [[2]], extracts just
   # the right hand side of the formula.
-  means <- eval(as.formula(paste(lmFormula,
-                                 collapse = ' + '))[[2]])
+  linearModel <- eval(as.formula(paste(lmFormula,
+                                       collapse = ' + '))[[2]])
 
-  # Simulate data from a normal distribution. This will be divided later to
-  # produce a vector of 0s and 1s binomial distribution with a new probability
-  # of success depending on the signal from the parents.
-  normalRV <- rnorm(n = N,
-                    mean = means,
-                    sd = 1)
+  # Use the inverse logit to calculate the probability of success for each
+  # observation.
+  probs <- 1 / (1 + exp(-linearModel))
 
-  # Create the cutoff for p in the standard normal distribution.
-  cutoff <- qnorm(p, 0, 1, lower.tail = FALSE)
-
-  # Return the binomial rv.
-  return (ifelse(normalRV > cutoff, 1, 0))
+  # Simulate data from a binomial distribution and return it.
+  return (rbinom(n = N,
+                 size = 1,
+                 prob = probs))
 
 }
 
 # cMulti
 #
-# @param N The number of observations to simulate.
+# Generates multinomial data for child nodes (nodes one or more parents).
 #
-# @param mParents The number of parent nodes.
+# @param N The number of observations to simulate.
 #
 # @param q The frequency of the reference allele.
 #
@@ -208,11 +225,21 @@ cBinom <- function (N,
 #' @importFrom stats as.formula qnorm
 #'
 cMulti <- function (N,
-                    mParents,
                     parentData,
                     b0,
                     b1,
                     q) {
+
+  # Check if the parent vector and the signal strength vector have the same
+  # number of elements.
+  if (length(parentData) != length(b1)) {
+
+    stop ('parentData and b1 must have the same number of elements')
+
+  }
+
+  # Determine the number of parents.
+  mParents <- length(parentData)
 
   # Create a vector that will hold a linear model as a character string.
   lmFormula <- vector(length = mParents + 1)
